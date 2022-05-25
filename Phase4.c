@@ -48,10 +48,33 @@ void getModel(Model models[]){
 
 				do {
 					fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiModel);
-					strncat_s(line, sizeof(char), &caracLu, 1);
+					//putchar(caracLu);
+					charCount += sprintf_s(line + charCount, BUFFER_SIZE - charCount, "%c", caracLu);
 				} while(caracLu != '\n');
-				puts(line);
+				// 3 types différents
+				// Averages
+				// Stds
+				// global averages
+				switch(iData) {
+					case 0:
+						models[iMov].motionType = decomposition(line, models[iMov].averages);
+						break;
+					case 1:
+						models[iMov].motionType = decomposition(line, models[iMov].stds);
+						break;
+					case 2:
+						char* token = NULL;
+						char* nextToken = NULL;
+						char s[2] = ",";
+						token = strtok_s(line, s, &nextToken); 
+						token = strtok_s(NULL, s, &nextToken);
+						models[iMov].globalAverage = atof(token);
+				}
+				// Affiche le model
+
+
 			}
+				printf("Moyenne generale : %f\n",models[iMov].globalAverage);
 		}
 	}
 }
