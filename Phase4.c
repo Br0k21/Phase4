@@ -21,10 +21,15 @@ struct model {
 
 void getModel(Model models[]);
 int decomposition(char line[], double data[]);
+int setEstimation(int estimatedClasses[], int realClasses[], Model models[]);
 
 void main(void) {
+	int estimatedClasses[NB_SEC], realClasses[NB_SEC];
+	int nbMov;
 	Model models[NB_CLASSES];
+	
 	getModel(models);
+	nbMov = setEstimation(estimatedClasses, realClasses, models);
 }
 
 void getModel(Model models[]){
@@ -33,7 +38,7 @@ void getModel(Model models[]){
 
 	fopen_s(&fiModel, PATH_NAME_MODEL, "r");
 
-	if(fiModel == NULL) printf("Erreur lors de l'ouverture du fichier");
+	if(fiModel == NULL) printf("Erreur lors de l'ouverture du fichier model");
 	else {
 		// Skiper la ligne des titres
 		do {
@@ -70,13 +75,59 @@ void getModel(Model models[]){
 						token = strtok_s(NULL, s, &nextToken);
 						models[iMov].globalAverage = atof(token);
 				}
-				// Affiche le model
-
-
 			}
-				printf("Moyenne generale : %f\n",models[iMov].globalAverage);
 		}
 	}
+}
+
+int setEstimation(int estimatedClasses[], int realClasses[], Model models[]){
+	// récupérer ligne par ligne trainSet et la traiter
+	FILE* fiTrain;
+	char caracLu;
+	int i = 0;
+
+	fopen_s(&fiTrain, PATH_NAME_TRAIN, "r");
+	if(fiTrain == NULL) printf("Erreur lors de l'ouverture du fichier trainSet");
+	else {
+		// Skiper la ligne des titres
+		do {
+			fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTrain);
+		} while(caracLu != '\n');
+		while(!feof(fiTrain)){
+			int iColonne = 0;
+			double testData[NB_SEC]; // Contient les données d'une ligne
+			char tmp[10];
+			char* str;
+			// Récupérer le motionType
+			if(caracLu == '\n'){
+				fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTrain);
+				printf("Motion type : %d\n", caracLu);
+				realClasses[i] = atoi(&caracLu);
+				i++;
+			}
+			// Skiper genre, index
+			int iTok = 0;
+			while(iTok < 3){
+				fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTrain);
+			    printf("Caractere a skipper : %c\n", caracLu);
+			    if(caracLu == ',') iTok++;
+			}
+
+			fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTrain);
+			while(caracLu != '\n'){
+				if(caracLu == ',') {
+					testData[iColonne] = strtod(tmp, &str);
+					iColonne++;
+					printf("Data numero %d : %f\n", iColonne+1, testData[iColonne]);
+				} else {
+					strcat_s(tmp, sizeof(char), &caracLu);
+				}
+			}
+
+		}
+	}
+
+	return i;
 }
 
 int decomposition(char line[], double data[]) {
