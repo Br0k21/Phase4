@@ -3,6 +3,8 @@
 #include <math.h>
 #include <string.h>
 
+#include "classificationPerfomances.h"
+
 #define NB_CLASSES 6
 #define BUFFER_SIZE 50000
 #define NB_SEC 1000
@@ -22,6 +24,10 @@ struct model {
 void getModel(Model models[]);
 int decomposition(char line[], double data[]);
 int setEstimation(int estimatedClasses[], int realClasses[], Model models[]);
+int getEstimationI1(double data[], Model models[]);
+int getEstimationI2(double data[], Model models[]);
+int getEstimationI3(double data[], Model models[]);
+void addEstimation(int estimatedClasses[], int e1, int e2, int e3, int i);
 
 void main(void) {
 	int estimatedClasses[NB_SEC], realClasses[NB_SEC];
@@ -30,6 +36,10 @@ void main(void) {
 	
 	getModel(models);
 	nbMov = setEstimation(estimatedClasses, realClasses, models);
+
+	displayResultByClasses(realClasses, estimatedClasses, nbMov);
+	displayAccuracy(realClasses, estimatedClasses, nbMov);
+	displayConfusionMatrix(realClasses, estimatedClasses, nbMov);
 }
 
 void getModel(Model models[]){
@@ -77,57 +87,156 @@ void getModel(Model models[]){
 				}
 			}
 		}
+
+		fclose(fiModel);
 	}
 }
 
 int setEstimation(int estimatedClasses[], int realClasses[], Model models[]){
-	// récupérer ligne par ligne trainSet et la traiter
-	FILE* fiTrain;
+	// récupérer ligne par ligne testSet et la traiter
+	FILE* fiTest;
 	char caracLu;
-	int i = 0;
+	int iLigne = 0;
 
-	fopen_s(&fiTrain, PATH_NAME_TRAIN, "r");
-	if(fiTrain == NULL) printf("Erreur lors de l'ouverture du fichier trainSet");
+	int estimatedClasseI1, estimatedClasseI2, estimatedClasseI3;
+
+	fopen_s(&fiTest, PATH_NAME_TEST, "r");
+	if(fiTest == NULL) printf("Erreur lors de l'ouverture du fichier trainSet");
 	else {
 		// Skiper la ligne des titres
 		do {
-			fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTrain);
+			fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTest);
 		} while(caracLu != '\n');
-		while(!feof(fiTrain)){
+		fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTest);
+
+		while(!feof(fiTest)){
 			int iColonne = 0;
+			int charCount = 0;
 			double testData[NB_SEC]; // Contient les données d'une ligne
 			char tmp[10];
-			char* str;
+
+
 			// Récupérer le motionType
-			if(caracLu == '\n'){
-				fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTrain);
-				printf("Motion type : %d\n", caracLu);
-				realClasses[i] = atoi(&caracLu);
-				i++;
-			}
+			if(iLigne == 0)
+				fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTest);
+			realClasses[iLigne] = atoi(&caracLu);
+			
+
+
 			// Skiper genre, index
 			int iTok = 0;
 			while(iTok < 3){
-				fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTrain);
-			    printf("Caractere a skipper : %c\n", caracLu);
+				fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTest);
 			    if(caracLu == ',') iTok++;
 			}
 
-			fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTrain);
+
+			// Récupérer une ligne de données
 			while(caracLu != '\n'){
+				fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTest);
+				//putchar(caracLu);
 				if(caracLu == ',') {
+					char* str;
 					testData[iColonne] = strtod(tmp, &str);
+					strcpy_s(tmp, sizeof(char), "");
+					charCount = 0;
 					iColonne++;
-					printf("Data numero %d : %f\n", iColonne+1, testData[iColonne]);
 				} else {
-					strcat_s(tmp, sizeof(char), &caracLu);
+					charCount += sprintf_s(tmp + charCount, sizeof(tmp) - charCount, "%c", caracLu);
 				}
 			}
 
+
+			// Traiter la ligne de données
+			// Distance par rapport a la moyenne
+			estimatedClasseI1 = getEstimationI1(testData, models);
+			// Distance par rapport à l'ecart type
+			estimatedClasseI2 = getEstimationI2(testData, models);
+			// Par rapport à la moyenne générale
+			estimatedClasseI3 = getEstimationI3(testData, models);
+			
+			addEstimation(estimatedClasses, estimatedClasseI1, estimatedClasseI2, estimatedClasseI3, iLigne);
+
+			iLigne++;
+			fread_s(&caracLu, sizeof(char), sizeof(char), 1, fiTest);
+		}
+
+		fclose(fiTest);
+	}
+
+	return iLigne;
+}
+
+void addEstimation(int estimatedClasses[], int e1, int e2, int e3, int i){
+	if(e1 == e2) estimatedClasses[i] = e1;
+	else if(e1 == e3) estimatedClasses[i] = e1;
+	else if(e2 == e3) estimatedClasses[i] = e2;
+	else estimatedClasses[i] = e1;
+}
+
+
+int getEstimationI1(double data[], Model models[]) {
+	int estimatedClasse;
+	double distanceMin = 99999;
+
+	for(int iClass = 0; iClass < NB_CLASSES; iClass++){
+		double distance = 0;
+		for(int iValue = 0; iValue < NB_SEC; iValue++){
+			distance += pow((data[iValue] - models[iClass].averages[iValue]),2);
+		}
+		distance = sqrt(distance);
+
+		if(distance < distanceMin) {
+			distanceMin = distance;
+			estimatedClasse = models[iClass+1].motionType;
 		}
 	}
 
-	return i;
+	return estimatedClasse;
+}
+
+int getEstimationI2(double data[], Model models[]){
+	int estimatedClasse;
+	double distanceMin = 99999;
+
+	for(int iClass = 0; iClass < NB_CLASSES; iClass++){
+		double distance = 0;
+		for(int iValue = 0; iValue < NB_SEC; iValue++){
+			distance += pow((data[iValue] - models[iClass].stds[iValue]),2);
+		}
+		distance = sqrt(distance);
+
+		if(distance < distanceMin) {
+			distanceMin = distance;
+			estimatedClasse = models[iClass+1].motionType;
+		}
+	}
+
+	return estimatedClasse;
+}
+
+int getEstimationI3(double data[], Model models[]) {
+	int estimatedClasse;
+	double average = 0;
+	double distanceMin = 9999;
+	double distance;
+
+	for(int iData = 0; iData < NB_SEC; iData++) average += data[iData];
+
+	average /= NB_SEC;
+
+	for(int iClass = 0; iClass < NB_CLASSES; iClass++) {
+
+		distance = pow((average - models[iClass].globalAverage),2);
+		distance = sqrt(distance);
+
+		if(distance < distanceMin) {
+			distanceMin = distance;
+			estimatedClasse = models[iClass+1].motionType;
+		}
+	}
+
+	return estimatedClasse;
 }
 
 int decomposition(char line[], double data[]) {
