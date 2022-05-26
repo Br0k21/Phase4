@@ -169,10 +169,7 @@ int setEstimation(int estimatedClasses[], int realClasses[], Model models[]){
 }
 
 void addEstimation(int estimatedClasses[], int e1, int e2, int e3, int i){
-	if(e1 == e2) estimatedClasses[i] = e1;
-	else if(e1 == e3) estimatedClasses[i] = e1;
-	else if(e2 == e3) estimatedClasses[i] = e2;
-	else estimatedClasses[i] = e1;
+	estimatedClasses[i] = (e2 == e3 ? e2 : e1);
 }
 
 
