@@ -37,6 +37,7 @@ void main(void) {
 	getModel(models);
 	nbMov = setEstimation(estimatedClasses, realClasses, models);
 
+	system("cls");
 	displayResultByClasses(realClasses, estimatedClasses, nbMov);
 	displayAccuracy(realClasses, estimatedClasses, nbMov);
 	displayConfusionMatrix(realClasses, estimatedClasses, nbMov);
